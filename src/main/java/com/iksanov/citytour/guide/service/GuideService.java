@@ -89,6 +89,18 @@ public class GuideService {
         Guide guide = guideRepository.findById(id)
                 .orElseThrow(() -> new GuideNotFoundException(id));
 
+        // TODO: Проверка на активные туры (добавим после создания TourRepository)
+        // boolean hasActiveTours = tourRepository.existsByGuideIdAndStatusNot(
+        //         id, TourStatus.CANCELLED
+        // );
+        // if (hasActiveTours) {
+        //     throw new BusinessException(
+        //             "Cannot delete guide with active tours",
+        //             "GUIDE_HAS_ACTIVE_TOURS",
+        //             HttpStatus.CONFLICT
+        //     );
+        // }
+
         guideRepository.delete(guide);
     }
 }
