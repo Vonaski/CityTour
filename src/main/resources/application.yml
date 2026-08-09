@@ -14,3 +14,8 @@ spring:
 
   flyway:
     enabled: true
+
+  logging:
+      level:
+        root: INFO
+        com.iksanov.citytour: DEBUG

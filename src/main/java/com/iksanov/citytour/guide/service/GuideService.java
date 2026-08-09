@@ -19,6 +19,7 @@ import com.iksanov.citytour.guide.repository.GuideRepository;
 import com.iksanov.citytour.tour.entity.TourStatus;
 import com.iksanov.citytour.tour.repository.TourRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GuideService {
@@ -35,6 +37,7 @@ public class GuideService {
     private final TourRepository tourRepository;
 
     public GuideResponse getById(Long id) {
+        log.debug("Getting guide: id={}", id);
         Guide guide = guideRepository.findById(id)
                 .orElseThrow(() -> new GuideNotFoundException(id));
 
@@ -42,6 +45,7 @@ public class GuideService {
     }
 
     public GuideListResponse getAll(Boolean active, Language language, int page, int size) {
+        log.debug("Getting guides: active={}, language={}, page={}, size={}", active, language, page, size);
         Pageable pageable = PageRequest.of(page, size);
 
         Page<Guide> guidePage = guideRepository.findAllByFilters(active, language, pageable);
@@ -57,6 +61,7 @@ public class GuideService {
 
     @Transactional
     public GuideResponse create(GuideCreateRequest request) {
+        log.info("Creating guide");
         Guide guide = guideMapper.toEntity(request);
         Set<GuideLanguage> languages = new HashSet<>();
 
@@ -69,11 +74,13 @@ public class GuideService {
 
         guide.setLanguages(languages);
         Guide savedGuide = guideRepository.save(guide);
+        log.info("Guide created: id={}", savedGuide.getId());
         return guideMapper.toResponse(savedGuide);
     }
 
     @Transactional
     public GuideResponse update(Long id, GuideUpdateRequest request) {
+        log.info("Updating guide: id={}", id);
         Guide guide = guideRepository.findById(id)
                 .orElseThrow(() -> new GuideNotFoundException(id));
 
@@ -87,23 +94,23 @@ public class GuideService {
             guide.getLanguages().add(guideLanguage);
         }
 
+        log.info("Guide updated: id={}", id);
         return guideMapper.toResponse(guide);
     }
 
     @Transactional
     public void delete(Long id) {
+        log.info("Deleting guide: id={}", id);
         Guide guide = guideRepository.findById(id)
                 .orElseThrow(() -> new GuideNotFoundException(id));
 
-        boolean hasActiveTours = tourRepository.existsByGuideIdAndStatusIn(id,
-                List.of(TourStatus.DRAFT, TourStatus.PUBLISHED)
-        );
+        boolean hasActiveTours = tourRepository.existsByGuideIdAndStatusIn(id, List.of(TourStatus.DRAFT, TourStatus.PUBLISHED));
 
-        if (hasActiveTours) {
-            throw new BusinessException("Cannot delete guide with active tours",
+        if (hasActiveTours) {throw new BusinessException("Cannot delete guide with active tours",
                                         "GUIDE_HAS_ACTIVE_TOURS",
                                          HttpStatus.CONFLICT);
         }
         guideRepository.delete(guide);
+        log.info("Guide deleted: id={}", id);
     }
 }
