@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Optional;
 
 public interface TourRepository extends JpaRepository<Tour, Long> {
@@ -44,5 +45,10 @@ public interface TourRepository extends JpaRepository<Tour, Long> {
             @Param("endTime") LocalDateTime endTime,
             @Param("cancelledStatus") TourStatus cancelledStatus,
             @Param("tourId") Long tourId
+    );
+
+    boolean existsByGuideIdAndStatusIn(
+            Long guideId,
+            Collection<TourStatus> statuses
     );
 }

@@ -1,8 +1,10 @@
 package com.iksanov.citytour.guide.service;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
+import com.iksanov.citytour.common.exception.BusinessException;
 import com.iksanov.citytour.common.exception.GuideNotFoundException;
 import com.iksanov.citytour.guide.dto.GuideCreateRequest;
 import com.iksanov.citytour.guide.dto.GuideListResponse;
@@ -14,10 +16,13 @@ import com.iksanov.citytour.guide.entity.GuideLanguageId;
 import com.iksanov.citytour.guide.entity.Language;
 import com.iksanov.citytour.guide.mapper.GuideMapper;
 import com.iksanov.citytour.guide.repository.GuideRepository;
+import com.iksanov.citytour.tour.entity.TourStatus;
+import com.iksanov.citytour.tour.repository.TourRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +32,7 @@ public class GuideService {
 
     private final GuideRepository guideRepository;
     private final GuideMapper guideMapper;
+    private final TourRepository tourRepository;
 
     public GuideResponse getById(Long id) {
         Guide guide = guideRepository.findById(id)
@@ -89,6 +95,15 @@ public class GuideService {
         Guide guide = guideRepository.findById(id)
                 .orElseThrow(() -> new GuideNotFoundException(id));
 
+        boolean hasActiveTours = tourRepository.existsByGuideIdAndStatusIn(id,
+                List.of(TourStatus.DRAFT, TourStatus.PUBLISHED)
+        );
+
+        if (hasActiveTours) {
+            throw new BusinessException("Cannot delete guide with active tours",
+                                        "GUIDE_HAS_ACTIVE_TOURS",
+                                         HttpStatus.CONFLICT);
+        }
         guideRepository.delete(guide);
     }
 }
