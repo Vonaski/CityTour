@@ -19,10 +19,10 @@ public interface TourRepository extends JpaRepository<Tour, Long> {
     @Query("""
         SELECT t
         FROM Tour t
-        WHERE (:guideId IS NULL OR t.guide.id = :guideId)
-          AND (:status IS NULL OR t.status = :status)
-          AND (:dateFrom IS NULL OR t.startTime >= :dateFrom)
-          AND (:dateTo IS NULL OR t.startTime <= :dateTo)
+        WHERE t.guide.id = COALESCE(:guideId, t.guide.id)
+          AND t.status = COALESCE(:status, t.status)
+          AND t.startTime >= COALESCE(:dateFrom, t.startTime)
+          AND t.startTime <= COALESCE(:dateTo, t.startTime)
         """)
     Page<Tour> findAllByFilters(
             @Param("guideId") Long guideId,
