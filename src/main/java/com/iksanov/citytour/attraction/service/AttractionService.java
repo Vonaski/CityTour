@@ -31,7 +31,7 @@ public class AttractionService {
 
     @Transactional
     public AttractionResponse create(AttractionRequest request) {
-        log.info("Creating attraction: name={}", request.getName());
+        log.info("Creating attraction: name={}", request.name());
         Attraction attraction = attractionMapper.toEntity(request);
         Attraction savedAttraction = attractionRepository.save(attraction);
         log.info("Attraction created: id={}", savedAttraction.getId());

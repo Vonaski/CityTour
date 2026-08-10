@@ -2,6 +2,10 @@ package com.iksanov.citytour.tour.entity;
 
 import com.iksanov.citytour.guide.entity.Guide;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -46,11 +50,7 @@ public class Tour {
     @Builder.Default
     private TourStatus status = TourStatus.DRAFT;
 
-    @OneToMany(
-            mappedBy = "tour",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true
-    )
+    @OneToMany(mappedBy = "tour", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("visitOrder ASC")
     @Builder.Default
     private List<TourStop> stops = new ArrayList<>();

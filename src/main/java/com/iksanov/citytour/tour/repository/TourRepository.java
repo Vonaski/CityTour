@@ -2,14 +2,16 @@ package com.iksanov.citytour.tour.repository;
 
 import com.iksanov.citytour.tour.entity.Tour;
 import com.iksanov.citytour.tour.entity.TourStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
-import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface TourRepository extends JpaRepository<Tour, Long> {
@@ -17,16 +19,16 @@ public interface TourRepository extends JpaRepository<Tour, Long> {
     @Query("""
             SELECT t
             FROM Tour t
-            WHERE (:guideId IS NULL OR t.guide.id = :guideId)
-              AND (:status IS NULL OR t.status = :status)
-              AND (:dateFrom IS NULL OR t.startTime >= :dateFrom)
-              AND (:dateTo IS NULL OR t.startTime <= :dateTo)
+            WHERE (:status IS NULL OR t.status = :status)
+              AND (:guideId IS NULL OR t.guide.id = :guideId)
+              AND (:from IS NULL OR t.startTime >= :from)
+              AND (:to IS NULL OR t.startTime <= :to)
             """)
     Page<Tour> findAllByFilters(
-            @Param("guideId") Long guideId,
             @Param("status") TourStatus status,
-            @Param("dateFrom") LocalDateTime dateFrom,
-            @Param("dateTo") LocalDateTime dateTo,
+            @Param("guideId") Long guideId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
             Pageable pageable
     );
 
@@ -49,6 +51,14 @@ public interface TourRepository extends JpaRepository<Tour, Long> {
 
     boolean existsByGuideIdAndStatusIn(
             Long guideId,
-            Collection<TourStatus> statuses
+            List<TourStatus> statuses
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT t
+            FROM Tour t
+            WHERE t.id = :id
+            """)
+    Optional<Tour> findByIdForUpdate(@Param("id") Long id);
 }

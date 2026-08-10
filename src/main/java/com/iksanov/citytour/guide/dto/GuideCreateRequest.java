@@ -4,27 +4,26 @@ import com.iksanov.citytour.guide.entity.Language;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
 
 import java.util.Set;
 
-@Getter
-@Setter
-public class GuideCreateRequest {
+public record GuideCreateRequest(
 
-    @NotBlank
-    @Size(min = 3, max = 120)
-    private String fullName;
+        @NotBlank
+        @Size(min = 3, max = 120)
+        String fullName,
 
-    @NotBlank
-    @Size(min = 9, max = 20)
-    private String phone;
+        @NotBlank
+        @Size(max = 20)
+        String phone,
 
-    @NotEmpty
-    private Set<Language> languages;
+        @NotEmpty
+        Set<Language> languages,
 
-    @Min(0)
-    private Integer experienceYears;
+        @NotNull
+        @Min(0)
+        Integer experienceYears
+) {
 }
