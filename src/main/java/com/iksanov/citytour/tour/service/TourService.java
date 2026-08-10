@@ -2,6 +2,7 @@ package com.iksanov.citytour.tour.service;
 
 import com.iksanov.citytour.attraction.entity.Attraction;
 import com.iksanov.citytour.attraction.repository.AttractionRepository;
+import com.iksanov.citytour.booking.entity.Booking;
 import com.iksanov.citytour.booking.entity.BookingStatus;
 import com.iksanov.citytour.booking.repository.BookingRepository;
 import com.iksanov.citytour.booking.service.BookingService;
@@ -11,6 +12,7 @@ import com.iksanov.citytour.guide.repository.GuideRepository;
 import com.iksanov.citytour.tour.dto.StopRequest;
 import com.iksanov.citytour.tour.dto.TourRequest;
 import com.iksanov.citytour.tour.dto.TourResponse;
+import com.iksanov.citytour.tour.dto.TourSummaryResponse;
 import com.iksanov.citytour.tour.entity.Tour;
 import com.iksanov.citytour.tour.entity.TourStatus;
 import com.iksanov.citytour.tour.entity.TourStop;
@@ -19,12 +21,13 @@ import com.iksanov.citytour.tour.repository.TourRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -68,11 +71,13 @@ public class TourService {
                 null
         );
 
+        validateStopRequests(request.stops());
+
         Tour tour = tourMapper.toEntity(request);
         tour.setGuide(guide);
         tour.setStatus(TourStatus.DRAFT);
 
-        replaceStops(tour, request.stops());
+        addStops(tour, request.stops());
 
         Tour savedTour = tourRepository.save(tour);
 
@@ -112,6 +117,39 @@ public class TourService {
                         pageable
                 )
                 .map(tourMapper::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public TourSummaryResponse getSummary(Long id) {
+        Tour tour = getTour(id);
+
+        Integer bookedSeats = bookingRepository.sumSeatsByTourIdAndStatus(id, BookingStatus.CONFIRMED);
+        Integer freeSeats = tour.getMaxSeats() - bookedSeats;
+        BigDecimal occupancyRate = BigDecimal.valueOf(bookedSeats)
+                .multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(tour.getMaxSeats()), 1, RoundingMode.HALF_UP);
+
+        BigDecimal totalRevenue = bookingRepository
+                .findAllByTourIdAndStatus(id, BookingStatus.CONFIRMED)
+                .stream()
+                .map(Booking::getTotalPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Integer totalStayMinutes = tour.getStops()
+                .stream()
+                .mapToInt(TourStop::getStayMinutes)
+                .sum();
+
+        Integer stopsCount = tour.getStops().size();
+
+        return new TourSummaryResponse(
+                freeSeats,
+                bookedSeats,
+                occupancyRate,
+                totalRevenue,
+                totalStayMinutes,
+                stopsCount
+        );
     }
 
     @Transactional
@@ -161,12 +199,12 @@ public class TourService {
             );
         }
 
+        validateStopRequests(request.stops());
         tourMapper.updateEntity(request, tour);
-
         tour.setGuide(guide);
-
-        replaceStops(tour, request.stops());
-
+        tour.getStops().clear();
+        tourRepository.flush();
+        addStops(tour, request.stops());
         return buildResponse(tour);
     }
 
@@ -284,14 +322,19 @@ public class TourService {
         }
     }
 
-    private void validateGuideAvailability(Long guideId, LocalDateTime startTime, LocalDateTime endTime, Long tourId) {
-        boolean hasOverlap = tourRepository.findOverlappingTour(
+    private void validateGuideAvailability(
+            Long guideId,
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            Long tourId
+    ) {
+        boolean hasOverlap = tourRepository.existsOverlappingTour(
                 guideId,
                 startTime,
                 endTime,
                 TourStatus.CANCELLED,
                 tourId
-        ).isPresent();
+        );
 
         if (hasOverlap) {
             throw new BusinessException(
@@ -389,9 +432,7 @@ public class TourService {
         }
     }
 
-    private void replaceStops(Tour tour, List<StopRequest> stopRequests) {
-        tour.getStops().clear();
-
+    private void addStops(Tour tour, List<StopRequest> stopRequests) {
         if (stopRequests == null || stopRequests.isEmpty()) {
             return;
         }
@@ -411,8 +452,37 @@ public class TourService {
             stop.setAttraction(attraction);
             stop.setVisitOrder(request.visitOrder());
             stop.setStayMinutes(request.stayMinutes());
+
             stops.add(stop);
         }
+
         tour.getStops().addAll(stops);
+    }
+
+    private void validateStopRequests(List<StopRequest> stops) {
+        if (stops == null) {
+            return;
+        }
+
+        Set<Long> attractionIds = new HashSet<>();
+        Set<Integer> visitOrders = new HashSet<>();
+
+        for (StopRequest stop : stops) {
+            if (!attractionIds.add(stop.attractionId())) {
+                throw new BusinessException(
+                        "An attraction cannot be used more than once in the same tour",
+                        "TOUR_DUPLICATE_ATTRACTION",
+                        HttpStatus.CONFLICT
+                );
+            }
+
+            if (!visitOrders.add(stop.visitOrder())) {
+                throw new BusinessException(
+                        "Tour stop visit orders must be unique",
+                        "TOUR_DUPLICATE_VISIT_ORDER",
+                        HttpStatus.CONFLICT
+                );
+            }
+        }
     }
 }

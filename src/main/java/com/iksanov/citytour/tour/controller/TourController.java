@@ -2,6 +2,7 @@ package com.iksanov.citytour.tour.controller;
 
 import com.iksanov.citytour.tour.dto.TourRequest;
 import com.iksanov.citytour.tour.dto.TourResponse;
+import com.iksanov.citytour.tour.dto.TourSummaryResponse;
 import com.iksanov.citytour.tour.entity.TourStatus;
 import com.iksanov.citytour.tour.service.TourService;
 import jakarta.validation.Valid;
@@ -23,9 +24,7 @@ public class TourController {
     private final TourService tourService;
 
     @PostMapping
-    public ResponseEntity<TourResponse> create(
-            @Valid @RequestBody TourRequest request
-    ) {
+    public ResponseEntity<TourResponse> create(@Valid @RequestBody TourRequest request) {
         TourResponse response = tourService.create(request);
 
         URI location = URI.create("/api/tours/" + response.id());
@@ -36,9 +35,7 @@ public class TourController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TourResponse> getById(
-            @PathVariable Long id
-    ) {
+    public ResponseEntity<TourResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(
                 tourService.getById(id)
         );
@@ -67,39 +64,37 @@ public class TourController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<TourResponse> update(
-            @PathVariable Long id,
-            @Valid @RequestBody TourRequest request
-    ) {
+    public ResponseEntity<TourResponse> update(@PathVariable Long id, @Valid @RequestBody TourRequest request) {
         return ResponseEntity.ok(
                 tourService.update(id, request)
         );
     }
 
     @PostMapping("/{id}/publish")
-    public ResponseEntity<TourResponse> publish(
-            @PathVariable Long id
-    ) {
+    public ResponseEntity<TourResponse> publish(@PathVariable Long id) {
         return ResponseEntity.ok(
                 tourService.publish(id)
         );
     }
 
     @PostMapping("/{id}/cancel")
-    public ResponseEntity<TourResponse> cancel(
-            @PathVariable Long id
-    ) {
+    public ResponseEntity<TourResponse> cancel(@PathVariable Long id) {
         return ResponseEntity.ok(
                 tourService.cancel(id)
         );
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(
-            @PathVariable Long id
-    ) {
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
         tourService.delete(id);
 
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/summary")
+    public ResponseEntity<TourSummaryResponse> getSummary(@PathVariable Long id) {
+        return ResponseEntity.ok(
+                tourService.getSummary(id)
+        );
     }
 }

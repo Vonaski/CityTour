@@ -45,13 +45,19 @@ public class AttractionService {
     }
 
     public Page<AttractionResponse> getAll(AttractionCategory category, String search, Pageable pageable) {
-        log.debug("Getting attractions: category={}, search={}, page={}, size={}",
-                  category,
-                  search,
-                  pageable.getPageNumber(),
-                  pageable.getPageSize()
-        );
-        return attractionRepository.findAllByFilters(category, search, pageable).map(attractionMapper::toResponse);
+        log.debug("Getting attractions: category={}, search={}, page={}, size={}", category, search, pageable.getPageNumber(), pageable.getPageSize());
+
+        Page<Attraction> attractions;
+        if (category != null && search != null && !search.isBlank()) {
+            attractions = attractionRepository.findAllByCategoryAndNameContainingIgnoreCase(category, search, pageable);
+        } else if (category != null) {
+            attractions = attractionRepository.findAllByCategory(category, pageable);
+        } else if (search != null && !search.isBlank()) {
+            attractions = attractionRepository.findAllByNameContainingIgnoreCase(search, pageable);
+        } else {
+            attractions = attractionRepository.findAll(pageable);
+        }
+        return attractions.map(attractionMapper::toResponse);
     }
 
     @Transactional

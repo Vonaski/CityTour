@@ -18,6 +18,7 @@ import com.iksanov.citytour.guide.mapper.GuideMapper;
 import com.iksanov.citytour.guide.repository.GuideRepository;
 import com.iksanov.citytour.tour.entity.TourStatus;
 import com.iksanov.citytour.tour.repository.TourRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -35,6 +36,7 @@ public class GuideService {
     private final GuideRepository guideRepository;
     private final GuideMapper guideMapper;
     private final TourRepository tourRepository;
+    private final EntityManager entityManager;
 
     @Transactional(readOnly = true)
     public GuideResponse getById(Long id) {
@@ -83,19 +85,16 @@ public class GuideService {
     @Transactional
     public GuideResponse update(Long id, GuideUpdateRequest request) {
         log.info("Updating guide: id={}", id);
-        Guide guide = guideRepository.findById(id)
-                .orElseThrow(() -> new GuideNotFoundException(id));
-
+        Guide guide = guideRepository.findById(id).orElseThrow(() -> new GuideNotFoundException(id));
         guideMapper.updateEntity(request, guide);
         guide.getLanguages().clear();
-
+        entityManager.flush();
         for (Language language : request.languages()) {
             GuideLanguage guideLanguage = new GuideLanguage();
             guideLanguage.setGuide(guide);
             guideLanguage.setId(new GuideLanguageId(guide.getId(), language));
             guide.getLanguages().add(guideLanguage);
         }
-
         log.info("Guide updated: id={}", id);
         return guideMapper.toResponse(guide);
     }

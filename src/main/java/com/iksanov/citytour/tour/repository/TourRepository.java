@@ -61,4 +61,21 @@ public interface TourRepository extends JpaRepository<Tour, Long> {
             WHERE t.id = :id
             """)
     Optional<Tour> findByIdForUpdate(@Param("id") Long id);
+
+    @Query("""
+        SELECT CASE WHEN COUNT(t) > 0 THEN true ELSE false END
+        FROM Tour t
+        WHERE t.guide.id = :guideId
+          AND t.status <> :cancelledStatus
+          AND t.startTime < :endTime
+          AND t.endTime > :startTime
+          AND (:tourId IS NULL OR t.id <> :tourId)
+        """)
+    boolean existsOverlappingTour(
+            @Param("guideId") Long guideId,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime,
+            @Param("cancelledStatus") TourStatus cancelledStatus,
+            @Param("tourId") Long tourId
+    );
 }

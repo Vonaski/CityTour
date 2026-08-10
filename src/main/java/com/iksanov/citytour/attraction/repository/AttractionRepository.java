@@ -24,4 +24,20 @@ public interface AttractionRepository extends JpaRepository<Attraction, Long> {
             @Param("search") String search,
             Pageable pageable
     );
+
+    Page<Attraction> findAllByCategory(
+            AttractionCategory category,
+            Pageable pageable
+    );
+
+    Page<Attraction> findAllByNameContainingIgnoreCase(
+            String name,
+            Pageable pageable
+    );
+
+    Page<Attraction> findAllByCategoryAndNameContainingIgnoreCase(
+            AttractionCategory category,
+            String name,
+            Pageable pageable
+    );
 }
