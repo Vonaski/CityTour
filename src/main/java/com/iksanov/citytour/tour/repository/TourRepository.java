@@ -17,18 +17,18 @@ import java.util.Optional;
 public interface TourRepository extends JpaRepository<Tour, Long> {
 
     @Query("""
-            SELECT t
-            FROM Tour t
-            WHERE (:status IS NULL OR t.status = :status)
-              AND (:guideId IS NULL OR t.guide.id = :guideId)
-              AND (:from IS NULL OR t.startTime >= :from)
-              AND (:to IS NULL OR t.startTime <= :to)
-            """)
+        SELECT t
+        FROM Tour t
+        WHERE (:guideId IS NULL OR t.guide.id = :guideId)
+          AND (:status IS NULL OR t.status = :status)
+          AND (:dateFrom IS NULL OR t.startTime >= :dateFrom)
+          AND (:dateTo IS NULL OR t.startTime <= :dateTo)
+        """)
     Page<Tour> findAllByFilters(
-            @Param("status") TourStatus status,
             @Param("guideId") Long guideId,
-            @Param("from") LocalDateTime from,
-            @Param("to") LocalDateTime to,
+            @Param("status") TourStatus status,
+            @Param("dateFrom") LocalDateTime dateFrom,
+            @Param("dateTo") LocalDateTime dateTo,
             Pageable pageable
     );
 
