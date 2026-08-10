@@ -1,0 +1,483 @@
+BASE_URL=http://localhost:8080
+
+4. Guides
+
+Сначала покажи список.
+
+curl -i "$BASE_URL/api/guides?page=0&size=20"
+
+Фильтр active:
+
+curl -i "$BASE_URL/api/guides?active=true&page=0&size=20"
+
+Фильтр по языку:
+
+curl -i "$BASE_URL/api/guides?language=EN&page=0&size=20"
+
+Конкретный Guide:
+
+curl -i "$BASE_URL/api/guides/1"
+
+Создание Guide
+curl -i -X POST "$BASE_URL/api/guides" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fullName": "Demo Guide",
+    "phone": "+998909999999",
+    "languages": ["UZ", "EN"],
+    "experienceYears": 6,
+    "active": true
+  }'
+
+5. Attractions
+
+Список:
+
+curl -i "$BASE_URL/api/attractions?page=0&size=20"
+
+Фильтр:
+
+curl -i "$BASE_URL/api/attractions?category=MONUMENT&page=0&size=20"
+
+Поиск:
+
+curl -i "$BASE_URL/api/attractions?search=Registan&page=0&size=20"
+
+ТЗ отдельно требует case-insensitive поиск по имени.
+
+Можно продемонстрировать:
+
+curl -i "$BASE_URL/api/attractions?search=registan&page=0&size=20"
+Создание Attraction
+curl -i -X POST "$BASE_URL/api/attractions" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Demo Attraction",
+    "address": "Tashkent, Demo Street",
+    "latitude": 41.300000,
+    "longitude": 69.250000,
+    "category": "MONUMENT",
+    "entryFee": 25000.00
+  }'
+
+6. Создаём главный demo tour
+
+Вот этот тур лучше использовать дальше во всей демонстрации.
+
+curl -i -X POST "$BASE_URL/api/tours" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Demo City Tour",
+    "guideId": 1,
+    "startTime": "2026-12-10T10:00:00",
+    "endTime": "2026-12-10T13:00:00",
+    "maxSeats": 5,
+    "pricePerSeat": 100.00,
+    "stops": [
+      {
+        "attractionId": 1,
+        "visitOrder": 1,
+        "stayMinutes": 60
+      },
+      {
+        "attractionId": 2,
+        "visitOrder": 2,
+        "stayMinutes": 60
+      }
+    ]
+  }'
+
+Получишь новый ID. Допустим:
+
+Location: /api/tours/23
+
+Дальше обозначим:
+
+TOUR_ID=23
+
+Внимание: не копируй 23 вслепую. Используй ID из своего ответа.
+
+Тур должен появиться как DRAFT, потому что новый Tour по ТЗ всегда создаётся в DRAFT.
+
+7. GET Tour
+curl -i "$BASE_URL/api/tours/$TOUR_ID"
+
+Здесь покажешь:
+
+status
+guide
+startTime/endTime
+maxSeats
+bookedSeats
+freeSeats
+pricePerSeat
+stops
+
+Именно такой состав response предусмотрен контрактом.
+
+8. Проверяем overlap Guide — BR-2
+
+Теперь создаём другой Tour для того же Guide #1, но пересекающийся по времени.
+
+Первый:
+
+10:00 ───────── 13:00
+
+Второй:
+
+12:00 ───────── 15:00
+
+Curl:
+
+curl -i -X POST "$BASE_URL/api/tours" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Overlapping Tour",
+    "guideId": 1,
+    "startTime": "2026-12-10T12:00:00",
+    "endTime": "2026-12-10T15:00:00",
+    "maxSeats": 5,
+    "pricePerSeat": 100.00,
+    "stops": [
+      {
+        "attractionId": 3,
+        "visitOrder": 1,
+        "stayMinutes": 60
+      },
+      {
+        "attractionId": 4,
+        "visitOrder": 2,
+        "stayMinutes": 60
+      }
+    ]
+  }'
+
+Ожидаем:
+
+409
+GUIDE_HAS_OVERLAPPING_TOUR
+
+У тебя именно такой код уже проверялся. BR-2 требует запрещать пересечение, но разрешает границу, например 10:00–12:00 и 12:00–14:00.
+
+
+9. Проверяем, что другой Guide может работать в то же время
+curl -i -X POST "$BASE_URL/api/tours" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Second Guide Same Time",
+    "guideId": 2,
+    "startTime": "2026-12-10T10:00:00",
+    "endTime": "2026-12-10T13:00:00",
+    "maxSeats": 5,
+    "pricePerSeat": 100.00,
+    "stops": [
+      {
+        "attractionId": 3,
+        "visitOrder": 1,
+        "stayMinutes": 60
+      },
+      {
+        "attractionId": 4,
+        "visitOrder": 2,
+        "stayMinutes": 60
+      }
+    ]
+  }'
+
+Ожидаем 201.
+
+10. Update DRAFT
+
+Допустим основной Tour получил ID 23.
+
+curl -i -X PUT "$BASE_URL/api/tours/23" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Updated Demo City Tour",
+    "guideId": 1,
+    "startTime": "2026-12-10T10:00:00",
+    "endTime": "2026-12-10T13:00:00",
+    "maxSeats": 5,
+    "pricePerSeat": 120.00,
+    "stops": [
+      {
+        "attractionId": 1,
+        "visitOrder": 1,
+        "stayMinutes": 60
+      },
+      {
+        "attractionId": 2,
+        "visitOrder": 2,
+        "stayMinutes": 60
+      },
+      {
+        "attractionId": 3,
+        "visitOrder": 3,
+        "stayMinutes": 60
+      }
+    ]
+  }'
+
+Это демонстрирует, что PUT полностью заменяет основные поля и список stops.
+
+11. Publish — BR-1 + BR-8
+curl -i -X POST "$BASE_URL/api/tours/23/publish"
+
+Ожидаем:
+
+200
+status: PUBLISHED
+
+Здесь одновременно демонстрируешь:
+
+минимум 2 stops;
+visitOrder = 1..N;
+уникальные attractions;
+duration >= sum(stayMinutes).
+
+Это именно BR-1 и BR-8.
+
+12. Создаём Booking
+
+Теперь главное.
+
+curl -i -X POST "$BASE_URL/api/tours/23/bookings" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customerName": "Demo Customer",
+    "customerPhone": "+998901234999",
+    "seats": 3
+  }'
+
+У нас:
+
+pricePerSeat = 120
+Registan = 50000
+Gur-e-Amir = 30000
+Bibi-Khanym = 25000
+
+Сумма entry fee:
+
+50000 + 30000 + 25000 = 105000
+
+Цена одного места:
+
+120 + 105000 = 105120
+
+Три места:
+
+105120 × 3 = 315360
+
+То есть totalPrice должен быть 315360.00.
+
+Это прямо BR-6:
+
+seats × (pricePerSeat + sum(entryFee))
+
+13. Capacity — BR-3
+
+У нас:
+
+maxSeats = 5
+already booked = 3
+
+Пробуем ещё 3:
+
+curl -i -X POST "$BASE_URL/api/tours/23/bookings" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customerName": "Too Many Seats",
+    "customerPhone": "+998901234998",
+    "seats": 3
+  }'
+
+Ожидаем:
+
+409
+NOT_ENOUGH_SEATS
+
+Это один из обязательных acceptance checks ТЗ.
+
+14. Получаем bookings
+curl -i "$BASE_URL/api/tours/23/bookings"
+
+Только confirmed:
+
+curl -i "$BASE_URL/api/tours/23/bookings?status=CONFIRMED"
+
+Только cancelled:
+
+curl -i "$BASE_URL/api/tours/23/bookings?status=CANCELLED"
+
+Эти endpoints прямо предусмотрены контрактом.
+
+15. Отменяем Booking
+
+После первого booking запомни его ID.
+
+Например:
+
+Location: /api/bookings/12
+
+Тогда:
+
+curl -i -X DELETE "$BASE_URL/api/bookings/12"
+
+Ожидаем:
+
+204 No Content
+
+Важно сказать на защите:
+
+DELETE здесь физически не удаляет booking. Он переводит его в CANCELLED, поэтому освободившиеся seats снова становятся доступными.
+
+Это соответствует ТЗ: DELETE /api/bookings/{id} — отмена брони, а не удаление.
+
+16. После отмены снова бронируем 4 места
+
+До отмены:
+
+5 capacity
+3 booked
+
+После cancellation:
+
+0 confirmed
+5 free
+
+Теперь:
+
+curl -i -X POST "$BASE_URL/api/tours/23/bookings" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customerName": "After Cancellation",
+    "customerPhone": "+998901234997",
+    "seats": 4
+  }'
+
+Должно быть:
+
+201
+
+Это прямо шаг 8 acceptance scenario из ТЗ.
+
+17. Summary
+curl -i "$BASE_URL/api/tours/23/summary"
+
+Получишь:
+
+freeSeats
+bookedSeats
+occupancyRate
+totalRevenue
+totalStayMinutes
+stopsCount
+
+Это отдельное требование ТЗ.
+
+18. Cancel Tour — BR-5
+curl -i -X POST "$BASE_URL/api/tours/23/cancel"
+
+После этого:
+
+Tour = CANCELLED
+
+И все CONFIRMED bookings этого тура должны стать:
+
+CANCELLED
+
+Это BR-5.
+
+Проверяем:
+
+curl -i "$BASE_URL/api/tours/23/bookings?status=CONFIRMED"
+
+Должно быть:
+
+[]
+
+И:
+
+curl -i "$BASE_URL/api/tours/23/bookings?status=CANCELLED"
+
+должен показать отменённые bookings.
+
+19. Tour filters
+
+Общий список:
+
+curl -i "$BASE_URL/api/tours?page=0&size=20"
+
+DRAFT:
+
+curl -i "$BASE_URL/api/tours?status=DRAFT&page=0&size=20"
+
+PUBLISHED:
+
+curl -i "$BASE_URL/api/tours?status=PUBLISHED&page=0&size=20"
+
+CANCELLED:
+
+curl -i "$BASE_URL/api/tours?status=CANCELLED&page=0&size=20"
+
+По Guide:
+
+curl -i "$BASE_URL/api/tours?guideId=1&page=0&size=20"
+
+По дате:
+
+curl -i "$BASE_URL/api/tours?dateFrom=2026-08-01T00:00:00&dateTo=2026-12-31T23:59:59&page=0&size=20"
+
+И можно комбинировать:
+
+curl -i "$BASE_URL/api/tours?guideId=1&status=PUBLISHED&page=0&size=20"
+
+Все эти query parameters прямо есть в TourController.
+
+20. Attraction DELETE — BR-7
+
+Берём Attraction, которая используется в DRAFT/PUBLISHED Tour.
+
+Например:
+
+curl -i -X DELETE "$BASE_URL/api/attractions/1"
+
+Ожидаем:
+
+409
+ATTRACTION_USED_BY_ACTIVE_TOUR
+
+Это BR-7: нельзя удалить объект, используемый DRAFT или PUBLISHED туром.
+
+21. Statistics — обязательно показать
+Guides
+curl -i "$BASE_URL/api/statistics/guides?from=2026-08-01&to=2026-12-31"
+
+ТЗ требует:
+
+guideId
+guideName
+toursCount
+totalHours
+seatsSold
+totalRevenue
+occupancyRate
+topCategory
+
+Причём только PUBLISHED tours, которые начинаются в заданном диапазоне. occupancyRate считается по sold seats / сумме maxSeats.
+
+Attractions top
+curl -i "$BASE_URL/api/statistics/attractions/top?limit=5&from=2026-08-01&to=2026-12-31"
+
+Показывает:
+
+attractionId
+name
+category
+tourCount
+visitorCount
+
+Сортировка:
+
+visitorCount DESC
+name ASC

@@ -309,10 +309,7 @@ public class TourService {
         );
     }
 
-    private void validateTimeRange(
-            LocalDateTime startTime,
-            LocalDateTime endTime
-    ) {
+    private void validateTimeRange(LocalDateTime startTime, LocalDateTime endTime) {
         if (!endTime.isAfter(startTime)) {
             throw new BusinessException(
                     "End time must be after start time",
@@ -322,12 +319,7 @@ public class TourService {
         }
     }
 
-    private void validateGuideAvailability(
-            Long guideId,
-            LocalDateTime startTime,
-            LocalDateTime endTime,
-            Long tourId
-    ) {
+    private void validateGuideAvailability(Long guideId, LocalDateTime startTime, LocalDateTime endTime, Long tourId) {
         boolean hasOverlap = tourRepository.existsOverlappingTour(
                 guideId,
                 startTime,

@@ -1,5 +1,6 @@
 INSERT INTO guides (id, full_name, phone, experience_years, active)
 VALUES
+    (1, 'Updated Test Guide', '+998901111111', 8, TRUE),
     (2, 'Dilshod Aliyev', '+998902222222', 5, TRUE),
     (3, 'Rustam Tursunov', '+998903333333', 12, TRUE),
     (4, 'Bekzod Rahimov', '+998904444444', 3, FALSE),
@@ -8,6 +9,9 @@ VALUES
 
 INSERT INTO guide_languages (guide_id, language)
 VALUES
+    (1, 'UZ'),
+    (1, 'EN'),
+
     (2, 'UZ'),
     (2, 'EN'),
 

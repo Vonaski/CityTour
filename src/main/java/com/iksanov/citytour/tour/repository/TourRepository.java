@@ -32,23 +32,6 @@ public interface TourRepository extends JpaRepository<Tour, Long> {
             Pageable pageable
     );
 
-    @Query("""
-            SELECT t
-            FROM Tour t
-            WHERE t.guide.id = :guideId
-              AND t.status <> :cancelledStatus
-              AND t.startTime < :endTime
-              AND t.endTime > :startTime
-              AND (:tourId IS NULL OR t.id <> :tourId)
-            """)
-    Optional<Tour> findOverlappingTour(
-            @Param("guideId") Long guideId,
-            @Param("startTime") LocalDateTime startTime,
-            @Param("endTime") LocalDateTime endTime,
-            @Param("cancelledStatus") TourStatus cancelledStatus,
-            @Param("tourId") Long tourId
-    );
-
     boolean existsByGuideIdAndStatusIn(
             Long guideId,
             List<TourStatus> statuses
