@@ -18,6 +18,9 @@ import com.iksanov.citytour.tour.mapper.TourMapper;
 import com.iksanov.citytour.tour.repository.TourRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -84,25 +87,31 @@ public class TourService {
     }
 
     @Transactional(readOnly = true)
-    public List<TourResponse> getAll(
-            TourStatus status,
+    public Page<TourResponse> getAll(
             Long guideId,
-            LocalDateTime from,
-            LocalDateTime to,
-            int page,
-            int size
+            TourStatus status,
+            LocalDateTime dateFrom,
+            LocalDateTime dateTo,
+            Pageable pageable
     ) {
-        var pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        log.debug(
+                "Getting tours: guideId={}, status={}, dateFrom={}, dateTo={}, page={}, size={}",
+                guideId,
+                status,
+                dateFrom,
+                dateTo,
+                pageable.getPageNumber(),
+                pageable.getPageSize()
+        );
 
         return tourRepository.findAllByFilters(
-                        status,
                         guideId,
-                        from,
-                        to,
+                        status,
+                        dateFrom,
+                        dateTo,
                         pageable
                 )
-                .map(this::buildResponse)
-                .getContent();
+                .map(tourMapper::toResponse);
     }
 
     @Transactional
