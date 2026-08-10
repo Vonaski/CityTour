@@ -103,15 +103,18 @@ public class GuideService {
     @Transactional
     public void delete(Long id) {
         log.info("Deleting guide: id={}", id);
-        Guide guide = guideRepository.findById(id)
-                .orElseThrow(() -> new GuideNotFoundException(id));
-
+        Guide guide = guideRepository.findById(id).orElseThrow(() -> new GuideNotFoundException(id));
         boolean hasActiveTours = tourRepository.existsByGuideIdAndStatusIn(id, List.of(TourStatus.DRAFT, TourStatus.PUBLISHED));
 
-        if (hasActiveTours) {throw new BusinessException("Cannot delete guide with active tours",
-                                        "GUIDE_HAS_ACTIVE_TOURS",
-                                         HttpStatus.CONFLICT);
+        if (hasActiveTours) {
+            log.warn("Cannot delete guide: id={} has active tours", id);
+            throw new BusinessException(
+                    "Cannot delete guide with active tours",
+                    "GUIDE_HAS_ACTIVE_TOURS",
+                    HttpStatus.CONFLICT
+            );
         }
+
         guideRepository.delete(guide);
         log.info("Guide deleted: id={}", id);
     }
