@@ -36,6 +36,7 @@ public class GuideService {
     private final GuideMapper guideMapper;
     private final TourRepository tourRepository;
 
+    @Transactional(readOnly = true)
     public GuideResponse getById(Long id) {
         log.debug("Getting guide: id={}", id);
         Guide guide = guideRepository.findById(id)
@@ -44,19 +45,20 @@ public class GuideService {
         return guideMapper.toResponse(guide);
     }
 
+    @Transactional(readOnly = true)
     public GuideListResponse getAll(Boolean active, Language language, int page, int size) {
         log.debug("Getting guides: active={}, language={}, page={}, size={}", active, language, page, size);
         Pageable pageable = PageRequest.of(page, size);
 
         Page<Guide> guidePage = guideRepository.findAllByFilters(active, language, pageable);
 
-        return GuideListResponse.builder()
-                .content(guideMapper.toResponseList(guidePage.getContent()))
-                .page(guidePage.getNumber())
-                .size(guidePage.getSize())
-                .totalElements(guidePage.getTotalElements())
-                .totalPages(guidePage.getTotalPages())
-                .build();
+        return new GuideListResponse(
+                guideMapper.toResponseList(guidePage.getContent()),
+                guidePage.getNumber(),
+                guidePage.getSize(),
+                guidePage.getTotalElements(),
+                guidePage.getTotalPages()
+        );
     }
 
     @Transactional
@@ -65,7 +67,7 @@ public class GuideService {
         Guide guide = guideMapper.toEntity(request);
         Set<GuideLanguage> languages = new HashSet<>();
 
-        for (Language language : request.getLanguages()) {
+        for (Language language : request.languages()) {
             GuideLanguage guideLanguage = new GuideLanguage();
             guideLanguage.setGuide(guide);
             guideLanguage.setId(new GuideLanguageId(null, language));
@@ -87,7 +89,7 @@ public class GuideService {
         guideMapper.updateEntity(request, guide);
         guide.getLanguages().clear();
 
-        for (Language language : request.getLanguages()) {
+        for (Language language : request.languages()) {
             GuideLanguage guideLanguage = new GuideLanguage();
             guideLanguage.setGuide(guide);
             guideLanguage.setId(new GuideLanguageId(guide.getId(), language));

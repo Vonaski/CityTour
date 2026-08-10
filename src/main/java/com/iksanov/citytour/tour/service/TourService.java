@@ -2,6 +2,9 @@ package com.iksanov.citytour.tour.service;
 
 import com.iksanov.citytour.attraction.entity.Attraction;
 import com.iksanov.citytour.attraction.repository.AttractionRepository;
+import com.iksanov.citytour.booking.entity.BookingStatus;
+import com.iksanov.citytour.booking.repository.BookingRepository;
+import com.iksanov.citytour.booking.service.BookingService;
 import com.iksanov.citytour.common.exception.BusinessException;
 import com.iksanov.citytour.guide.entity.Guide;
 import com.iksanov.citytour.guide.repository.GuideRepository;
@@ -13,174 +16,347 @@ import com.iksanov.citytour.tour.entity.TourStatus;
 import com.iksanov.citytour.tour.entity.TourStop;
 import com.iksanov.citytour.tour.mapper.TourMapper;
 import com.iksanov.citytour.tour.repository.TourRepository;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TourService {
 
     private final TourRepository tourRepository;
-    private final GuideRepository guideRepository;
-    private final AttractionRepository attractionRepository;
     private final TourMapper tourMapper;
+    private final GuideRepository guideRepository;
+    private final BookingRepository bookingRepository;
+    private final AttractionRepository attractionRepository;
+    private final BookingService bookingService;
 
     @Transactional
     public TourResponse create(TourRequest request) {
-        log.info("Creating tour: title={}", request.getTitle());
-        Guide guide = guideRepository.findById(request.getGuideId())
+        log.info(
+                "Creating tour: guideId={}, title={}",
+                request.guideId(),
+                request.title()
+        );
+
+        validateTimeRange(request.startTime(), request.endTime());
+
+        Guide guide = guideRepository.findById(request.guideId())
                 .orElseThrow(() -> new BusinessException(
-                        "Guide not found: " + request.getGuideId(),
+                        "Guide not found: " + request.guideId(),
                         "GUIDE_NOT_FOUND",
                         HttpStatus.NOT_FOUND
                 ));
 
         validateGuideAvailability(
-                guide.getId(),
-                request.getStartTime(),
-                request.getEndTime(),
+                request.guideId(),
+                request.startTime(),
+                request.endTime(),
                 null
         );
 
-        Tour tour = Tour.builder()
-                .title(request.getTitle())
-                .guide(guide)
-                .startTime(request.getStartTime())
-                .endTime(request.getEndTime())
-                .maxSeats(request.getMaxSeats())
-                .pricePerSeat(request.getPricePerSeat())
-                .status(TourStatus.DRAFT)
-                .build();
+        Tour tour = tourMapper.toEntity(request);
+        tour.setGuide(guide);
+        tour.setStatus(TourStatus.DRAFT);
 
-        setStops(tour, request.getStops());
+        replaceStops(tour, request.stops());
+
         Tour savedTour = tourRepository.save(tour);
-        log.info("Tour created: id={}", savedTour.getId());
-        return tourMapper.toResponse(savedTour);
+
+        return buildResponse(savedTour);
+    }
+
+    @Transactional(readOnly = true)
+    public TourResponse getById(Long id) {
+        Tour tour = getTour(id);
+
+        return buildResponse(tour);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TourResponse> getAll(
+            TourStatus status,
+            Long guideId,
+            LocalDateTime from,
+            LocalDateTime to,
+            int page,
+            int size
+    ) {
+        var pageable = org.springframework.data.domain.PageRequest.of(page, size);
+
+        return tourRepository.findAllByFilters(
+                        status,
+                        guideId,
+                        from,
+                        to,
+                        pageable
+                )
+                .map(this::buildResponse)
+                .getContent();
     }
 
     @Transactional
     public TourResponse update(Long id, TourRequest request) {
         log.info("Updating tour: id={}", id);
+
+        validateTimeRange(request.startTime(), request.endTime());
+
         Tour tour = getTour(id);
 
-        Guide guide = guideRepository.findById(request.getGuideId())
+        if (tour.getStatus() != TourStatus.DRAFT) {
+            throw new BusinessException(
+                    "Only draft tours can be updated",
+                    "TOUR_CANNOT_BE_UPDATED",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        Guide guide = guideRepository.findById(request.guideId())
                 .orElseThrow(() -> new BusinessException(
-                        "Guide not found: " + request.getGuideId(),
+                        "Guide not found: " + request.guideId(),
                         "GUIDE_NOT_FOUND",
                         HttpStatus.NOT_FOUND
                 ));
 
         validateGuideAvailability(
-                guide.getId(),
-                request.getStartTime(),
-                request.getEndTime(),
-                tour.getId()
+                request.guideId(),
+                request.startTime(),
+                request.endTime(),
+                id
         );
 
-        tour.setTitle(request.getTitle());
+        Integer confirmedSeats = bookingRepository.sumSeatsByTourIdAndStatus(
+                id,
+                BookingStatus.CONFIRMED
+        );
+
+        if (confirmedSeats == null) {
+            confirmedSeats = 0;
+        }
+
+        if (confirmedSeats > request.maxSeats()) {
+            throw new BusinessException(
+                    "Max seats cannot be less than already booked seats",
+                    "TOUR_MAX_SEATS_TOO_LOW",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        tourMapper.updateEntity(request, tour);
+
         tour.setGuide(guide);
-        tour.setStartTime(request.getStartTime());
-        tour.setEndTime(request.getEndTime());
-        tour.setMaxSeats(request.getMaxSeats());
-        tour.setPricePerSeat(request.getPricePerSeat());
 
-        tour.getStops().clear();
-        setStops(tour, request.getStops());
-        log.info("Tour updated: id={}", id);
-        return tourMapper.toResponse(tour);
-    }
+        replaceStops(tour, request.stops());
 
-    public TourResponse getById(Long id) {
-        log.debug("Getting tour: id={}", id);
-        Tour tour = getTour(id);
-        return tourMapper.toResponse(tour);
-    }
-
-    public Page<TourResponse> getAll(Long guideId, TourStatus status, LocalDateTime dateFrom, LocalDateTime dateTo, Pageable pageable) {
-        log.debug("Getting tours: guideId={}, status={}, dateFrom={}, dateTo={}, page={}, size={}", guideId, status, dateFrom, dateTo, pageable.getPageNumber(), pageable.getPageSize());
-        return tourRepository.findAllByFilters(
-                        guideId,
-                        status,
-                        dateFrom,
-                        dateTo,
-                        pageable
-                )
-                .map(tourMapper::toResponse);
+        return buildResponse(tour);
     }
 
     @Transactional
     public TourResponse publish(Long id) {
         log.info("Publishing tour: id={}", id);
+
         Tour tour = getTour(id);
+
+        if (tour.getStatus() != TourStatus.DRAFT) {
+            throw new BusinessException(
+                    "Only draft tours can be published",
+                    "TOUR_CANNOT_BE_PUBLISHED",
+                    HttpStatus.CONFLICT
+            );
+        }
 
         validatePublish(tour);
 
         tour.setStatus(TourStatus.PUBLISHED);
-        log.info("Tour published: id={}", id);
-        return tourMapper.toResponse(tour);
+
+        return buildResponse(tour);
+    }
+
+    @Transactional
+    public TourResponse cancel(Long id) {
+        log.info("Cancelling tour: id={}", id);
+
+        Tour tour = getTour(id);
+
+        if (tour.getStatus() == TourStatus.CANCELLED) {
+            return buildResponse(tour);
+        }
+
+        tour.setStatus(TourStatus.CANCELLED);
+
+        bookingService.cancelConfirmedByTourId(id);
+
+        return buildResponse(tour);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        log.info("Deleting tour: id={}", id);
+
+        Tour tour = getTour(id);
+
+        if (tour.getStatus() != TourStatus.DRAFT) {
+            throw new BusinessException(
+                    "Only draft tours can be deleted",
+                    "TOUR_CANNOT_BE_DELETED",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        if (bookingRepository.existsByTourId(id)) {
+            throw new BusinessException(
+                    "Cannot delete tour with bookings",
+                    "TOUR_HAS_BOOKINGS",
+                    HttpStatus.CONFLICT
+            );
+        }
+
+        tourRepository.delete(tour);
+    }
+
+    private Tour getTour(Long id) {
+        return tourRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(
+                        "Tour not found: " + id,
+                        "TOUR_NOT_FOUND",
+                        HttpStatus.NOT_FOUND
+                ));
+    }
+
+    private TourResponse buildResponse(Tour tour) {
+        TourResponse response = tourMapper.toResponse(tour);
+
+        Integer bookedSeats = bookingRepository.sumSeatsByTourIdAndStatus(
+                tour.getId(),
+                BookingStatus.CONFIRMED
+        );
+
+        if (bookedSeats == null) {
+            bookedSeats = 0;
+        }
+
+        int freeSeats = tour.getMaxSeats() - bookedSeats;
+
+        return new TourResponse(
+                response.id(),
+                response.title(),
+                response.status(),
+                response.guide(),
+                response.startTime(),
+                response.endTime(),
+                response.maxSeats(),
+                bookedSeats,
+                freeSeats,
+                response.pricePerSeat(),
+                response.stops()
+        );
+    }
+
+    private void validateTimeRange(
+            LocalDateTime startTime,
+            LocalDateTime endTime
+    ) {
+        if (!endTime.isAfter(startTime)) {
+            throw new BusinessException(
+                    "End time must be after start time",
+                    "INVALID_TIME_RANGE",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+    }
+
+    private void validateGuideAvailability(Long guideId, LocalDateTime startTime, LocalDateTime endTime, Long tourId) {
+        boolean hasOverlap = tourRepository.findOverlappingTour(
+                guideId,
+                startTime,
+                endTime,
+                TourStatus.CANCELLED,
+                tourId
+        ).isPresent();
+
+        if (hasOverlap) {
+            throw new BusinessException(
+                    "Guide already has an overlapping tour",
+                    "GUIDE_HAS_OVERLAPPING_TOUR",
+                    HttpStatus.CONFLICT
+            );
+        }
     }
 
     private void validatePublish(Tour tour) {
         validateStopCount(tour);
-
-        validateStopOrders(
-                tour.getStops()
-                        .stream()
-                        .map(TourStop::getVisitOrder)
-                        .toList()
-        );
-
+        validateStopOrders(tour);
+        validateUniqueAttractions(tour);
         validateTourDuration(tour);
     }
 
     private void validateStopCount(Tour tour) {
-        if (tour.getStops().size() < 2) {
-            log.warn("Cannot publish tour: id={} has less than 2 stops", tour.getId());
+        if (tour.getStops() == null || tour.getStops().size() < 2) {
             throw new BusinessException(
-                    "Tour must have at least 2 stops to be published",
-                    "MIN_STOPS_REQUIRED",
+                    "Published tour must contain at least 2 stops",
+                    "TOUR_MIN_STOPS_NOT_MET",
                     HttpStatus.CONFLICT
             );
         }
     }
 
-    private void validateStopOrders(List<Integer> orders) {
+    private void validateStopOrders(Tour tour) {
+        List<Integer> orders = tour.getStops()
+                .stream()
+                .map(TourStop::getVisitOrder)
+                .toList();
+
         Set<Integer> uniqueOrders = new HashSet<>(orders);
 
         if (uniqueOrders.size() != orders.size()) {
-            log.warn("Duplicate visitOrder detected: orders={}", orders);
             throw new BusinessException(
-                    "Duplicate visitOrder",
-                    "DUPLICATE_VISIT_ORDER",
+                    "Tour stop visit orders must be unique",
+                    "TOUR_DUPLICATE_VISIT_ORDER",
                     HttpStatus.CONFLICT
             );
         }
 
-        int expectedOrder = 1;
+        List<Integer> sortedOrders = orders.stream()
+                .sorted()
+                .toList();
 
-        for (Integer order : uniqueOrders.stream().sorted().toList()) {
-            if (order != expectedOrder) {
-                log.warn("Invalid visitOrder sequence: orders={}", orders);
+        for (int i = 0; i < sortedOrders.size(); i++) {
+            int expectedOrder = i + 1;
+
+            if (sortedOrders.get(i) != expectedOrder) {
                 throw new BusinessException(
-                        "visitOrder must contain sequential values from 1 to N",
-                        "INVALID_VISIT_ORDER",
+                        "Tour stop visit orders must be sequential starting from 1",
+                        "TOUR_INVALID_VISIT_ORDER",
                         HttpStatus.CONFLICT
                 );
             }
+        }
+    }
 
-            expectedOrder++;
+    private void validateUniqueAttractions(Tour tour) {
+        List<Long> attractionIds = tour.getStops()
+                .stream()
+                .map(stop -> stop.getAttraction().getId())
+                .toList();
+
+        Set<Long> uniqueAttractionIds = new HashSet<>(attractionIds);
+
+        if (uniqueAttractionIds.size() != attractionIds.size()) {
+            throw new BusinessException(
+                    "An attraction cannot be used more than once in the same tour",
+                    "TOUR_DUPLICATE_ATTRACTION",
+                    HttpStatus.CONFLICT
+            );
         }
     }
 
@@ -195,79 +371,39 @@ public class TourService {
                 tour.getEndTime()
         ).toMinutes();
 
-        if (tourDurationMinutes < totalStayMinutes) {
-            log.warn("Insufficient tour duration: tourId={}, duration={} min, totalStay={} min", tour.getId(), tourDurationMinutes, totalStayMinutes);
+        if (totalStayMinutes > tourDurationMinutes) {
             throw new BusinessException(
-                    "Tour duration (" + tourDurationMinutes
-                            + " min) is less than total stay time ("
-                            + totalStayMinutes + " min)",
-                    "INSUFFICIENT_TOUR_DURATION",
+                    "Total stop duration exceeds tour duration",
+                    "TOUR_DURATION_TOO_SHORT",
                     HttpStatus.CONFLICT
             );
         }
     }
 
-    private void validateGuideAvailability(
-            Long guideId,
-            LocalDateTime startTime,
-            LocalDateTime endTime,
-            Long tourId
-    ) {
-        tourRepository.findOverlappingTour(
-                guideId,
-                startTime,
-                endTime,
-                TourStatus.CANCELLED,
-                tourId
-        ).ifPresent(existingTour -> {
-            log.warn("Guide time overlap: guideId={}, startTime={}, endTime={}, existingTourId={}", guideId, startTime, endTime, existingTour.getId());
-            throw new BusinessException(
-                    "Guide " + guideId
-                            + " already has an overlapping tour",
-                    "GUIDE_TIME_OVERLAP",
-                    HttpStatus.CONFLICT
-            );
-        });
-    }
+    private void replaceStops(Tour tour, List<StopRequest> stopRequests) {
+        tour.getStops().clear();
 
-    private void setStops(Tour tour, List<StopRequest> requests) {
-        if (requests == null || requests.isEmpty()) {
+        if (stopRequests == null || stopRequests.isEmpty()) {
             return;
         }
 
-        validateStopOrders(
-                requests.stream()
-                        .map(StopRequest::getVisitOrder)
-                        .toList()
-        );
+        List<TourStop> stops = new ArrayList<>();
 
-        for (StopRequest request : requests) {
-            Attraction attraction = attractionRepository
-                    .findById(request.getAttractionId())
+        for (StopRequest request : stopRequests) {
+            Attraction attraction = attractionRepository.findById(request.attractionId())
                     .orElseThrow(() -> new BusinessException(
-                            "Attraction not found: "
-                                    + request.getAttractionId(),
+                            "Attraction not found: " + request.attractionId(),
                             "ATTRACTION_NOT_FOUND",
                             HttpStatus.NOT_FOUND
                     ));
 
-            TourStop stop = TourStop.builder()
-                    .tour(tour)
-                    .attraction(attraction)
-                    .visitOrder(request.getVisitOrder())
-                    .stayMinutes(request.getStayMinutes())
-                    .build();
-
-            tour.getStops().add(stop);
+            TourStop stop = new TourStop();
+            stop.setTour(tour);
+            stop.setAttraction(attraction);
+            stop.setVisitOrder(request.visitOrder());
+            stop.setStayMinutes(request.stayMinutes());
+            stops.add(stop);
         }
-    }
-
-    private Tour getTour(Long id) {
-        return tourRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(
-                        "Tour not found: " + id,
-                        "TOUR_NOT_FOUND",
-                        HttpStatus.NOT_FOUND
-                ));
+        tour.getStops().addAll(stops);
     }
 }

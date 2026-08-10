@@ -2,6 +2,8 @@ package com.iksanov.citytour.tour.entity;
 
 import com.iksanov.citytour.attraction.entity.Attraction;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.*;
 
 @Entity
@@ -25,9 +27,12 @@ public class TourStop {
     @JoinColumn(name = "attraction_id", nullable = false)
     private Attraction attraction;
 
+    @Min(1)
     @Column(name = "visit_order", nullable = false)
     private Integer visitOrder;
 
+    @Min(5)
+    @Max(240)
     @Column(name = "stay_minutes", nullable = false)
     private Integer stayMinutes;
 }

@@ -1,20 +1,16 @@
 package com.iksanov.citytour.attraction.dto;
 
 import com.iksanov.citytour.attraction.entity.AttractionCategory;
-import lombok.Builder;
-import lombok.Getter;
 
 import java.math.BigDecimal;
 
-@Getter
-@Builder
-public class AttractionResponse {
-
-    private Long id;
-    private String name;
-    private String address;
-    private Double latitude;
-    private Double longitude;
-    private AttractionCategory category;
-    private BigDecimal entryFee;
+public record AttractionResponse(
+        Long id,
+        String name,
+        String address,
+        BigDecimal latitude,
+        BigDecimal longitude,
+        AttractionCategory category,
+        BigDecimal entryFee
+) {
 }

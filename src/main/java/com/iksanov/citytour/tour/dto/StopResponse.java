@@ -1,17 +1,10 @@
 package com.iksanov.citytour.tour.dto;
 
-import lombok.Builder;
-import lombok.Getter;
+import com.iksanov.citytour.attraction.dto.AttractionResponse;
 
-import java.math.BigDecimal;
-
-@Getter
-@Builder
-public class StopResponse {
-
-    private Long attractionId;
-    private String name;
-    private Integer visitOrder;
-    private Integer stayMinutes;
-    private BigDecimal entryFee;
+public record StopResponse(
+        Integer visitOrder,
+        Integer stayMinutes,
+        AttractionResponse attraction
+) {
 }

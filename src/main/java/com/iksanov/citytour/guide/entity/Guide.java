@@ -9,6 +9,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -30,7 +33,7 @@ public class Guide {
     @Column(name = "full_name", nullable = false, length = 120)
     private String fullName;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 20)
     private String phone;
 
     @Column(name = "experience_years", nullable = false)
@@ -39,8 +42,7 @@ public class Guide {
     @Column(nullable = false)
     private Boolean active = true;
 
-    @OneToMany(
-            mappedBy = "guide",
+    @OneToMany(mappedBy = "guide",
             cascade = CascadeType.ALL,
             orphanRemoval = true,
             fetch = FetchType.LAZY

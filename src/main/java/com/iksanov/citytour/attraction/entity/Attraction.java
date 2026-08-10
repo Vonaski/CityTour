@@ -1,6 +1,10 @@
 package com.iksanov.citytour.attraction.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -18,7 +22,7 @@ public class Attraction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true, length = 255)
     private String name;
 
     private String address;
@@ -33,6 +37,7 @@ public class Attraction {
     @Column(nullable = false)
     private AttractionCategory category;
 
+    @DecimalMin("0.00")
     @Column(name = "entry_fee", nullable = false, precision = 12, scale = 2)
     private BigDecimal entryFee;
 }

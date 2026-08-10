@@ -5,34 +5,34 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import lombok.Getter;
-import lombok.Setter;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
-@Getter
-@Setter
-public class AttractionRequest {
+public record AttractionRequest(
 
-    @NotBlank
-    private String name;
+        @NotBlank
+        @Size(max = 255)
+        String name,
 
-    private String address;
+        @Size(max = 255)
+        String address,
 
-    @NotNull
-    @DecimalMin(value = "37.0")
-    @DecimalMax(value = "46.0")
-    private Double latitude;
+        @NotNull
+        @DecimalMin("37.0")
+        @DecimalMax("46.0")
+        BigDecimal latitude,
 
-    @NotNull
-    @DecimalMin(value = "55.0")
-    @DecimalMax(value = "74.0")
-    private Double longitude;
+        @NotNull
+        @DecimalMin("55.0")
+        @DecimalMax("74.0")
+        BigDecimal longitude,
 
-    @NotNull
-    private AttractionCategory category;
+        @NotNull
+        AttractionCategory category,
 
-    @NotNull
-    @DecimalMin(value = "0.0")
-    private BigDecimal entryFee;
+        @NotNull
+        @DecimalMin("0.0")
+        BigDecimal entryFee
+) {
 }
