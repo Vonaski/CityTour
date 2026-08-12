@@ -81,7 +81,7 @@ public class StatisticsService {
             categoriesByGuide
                     .computeIfAbsent(
                             guideId,
-                            id -> new HashMap<>()
+                            _ -> new HashMap<>()
                     )
                     .put(category, count);
         }

@@ -88,7 +88,7 @@ public interface StatisticsRepository extends Repository<Tour, Long> {
               AND t.start_time >= :from
               AND t.start_time < :to
             GROUP BY a.id, a.name, a.category
-            ORDER BY visitor_count DESC, name ASC
+            ORDER BY visitor_count DESC, name
             """,
             nativeQuery = true)
     List<Object[]> findTopAttractions(
